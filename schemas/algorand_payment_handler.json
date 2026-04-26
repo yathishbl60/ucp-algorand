@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/algorand/ucp-algorand/main/schemas/algorand_payment_handler.json",
+  "name": "org.algorand.shopping.payment_handler",
+  "title": "Algorand Payment Handler",
+  "description": "UCP payment handler enabling checkout payments via Algorand (ALGO native currency and Algorand Standard Assets). Supports MainNet, TestNet and BetaNet. Merchant provides receiver address and accepted assets; platform submits a signed Algorand transaction and supplies the confirmed transaction ID as the payment credential.",
+  "version": "2026-04-26",
+  "requires": {
+    "protocol": { "min": "2026-04-08" },
+    "capabilities": {
+      "dev.ucp.shopping.checkout": { "min": "2026-04-08" }
+    }
+  },
+  "$defs": {
+    "AlgorandNetwork": {
+      "type": "string",
+      "enum": ["mainnet", "testnet", "betanet"],
+      "description": "Algorand network identifier."
+    },
+    "AlgorandAddress": {
+      "type": "string",
+      "pattern": "^[A-Z2-7]{58}$",
+      "description": "A valid Algorand base32-encoded public address (58 uppercase alphanumeric chars)."
+    },
+    "AssetDefinition": {
+      "type": "object",
+      "required": ["id", "symbol", "decimals"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Algorand Standard Asset ID. Use 0 to represent native ALGO."
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Human-readable ticker symbol (e.g. ALGO, USDC, USDT)."
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 19,
+          "description": "Number of decimal places for this asset."
+        },
+        "name": {
+          "type": "string",
+          "description": "Optional human-readable asset name."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AlgorandHandlerConfig": {
+      "type": "object",
+      "required": ["network", "receiver_address", "accepted_assets"],
+      "properties": {
+        "network": { "$ref": "#/$defs/AlgorandNetwork" },
+        "receiver_address": {
+          "$ref": "#/$defs/AlgorandAddress",
+          "description": "The merchant's Algorand address that must receive the payment."
+        },
+        "accepted_assets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/AssetDefinition" },
+          "description": "List of ALGO or ASAs this merchant accepts. Platforms MUST use one of these for payment."
+        },
+        "memo_field": {
+          "type": "string",
+          "enum": ["ucp_checkout_id", "custom"],
+          "default": "ucp_checkout_id",
+          "description": "Specifies what the transaction note/memo field must contain. 'ucp_checkout_id' means the platform MUST set the tx note to the UCP checkout session ID (UTF-8, base64-encoded). Required for merchant-side verification."
+        },
+        "escrow_app_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional Algorand application ID of the PaymentEscrow smart contract. When present, platforms MUST route payment through the escrow contract rather than directly to receiver_address."
+        },
+        "min_confirmations": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Minimum number of confirmed Algorand rounds before the business considers the payment final. 1 round (~4 seconds) is sufficient for most use cases given Algorand's immediate finality."
+        },
+        "indexer_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Optional public Algorand indexer endpoint the platform can use to verify transaction status before calling complete_checkout."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AlgorandPaymentInstrument": {
+      "type": "object",
+      "description": "An available payment instrument for the Algorand handler.",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["algo", "asa"],
+          "description": "'algo' for native ALGO payments; 'asa' for Algorand Standard Assets."
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "asset_ids": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1 },
+              "description": "When type='asa', restricts acceptable ASA IDs. If absent, any opted-in ASA is acceptable."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "AlgorandCredential": {
+      "type": "object",
+      "required": ["txid"],
+      "description": "The payment credential that the platform submits in complete_checkout. Contains the confirmed Algorand transaction ID and the network it was submitted on.",
+      "properties": {
+        "txid": {
+          "type": "string",
+          "pattern": "^[A-Z2-7]{52}$",
+          "description": "The confirmed Algorand transaction ID (base32-encoded, 52 uppercase alphanumeric characters). This is the transaction that transferred ALGO or ASA to the merchant's receiver_address."
+        },
+        "network": {
+          "$ref": "#/$defs/AlgorandNetwork",
+          "description": "The Algorand network on which the transaction was submitted. MUST match the handler config's network."
+        },
+        "asset_id": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The ASA ID used for this payment. 0 for native ALGO. MUST match one of the merchant's accepted_assets."
+        },
+        "round": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Optional: the confirmed Algorand round number. Allows the business to quickly fetch transaction details without a full indexer search."
+        }
+      },
+      "additionalProperties": false
+    },
+    "dev.ucp.shopping.checkout": {
+      "title": "Checkout with Algorand Payment",
+      "description": "Extends the UCP checkout schema to declare Algorand as a payment instrument. Platforms that support Algorand will include an AlgorandCredential in the complete_checkout request.",
+      "allOf": [
+        { "$ref": "https://ucp.dev/2026-04-08/schemas/shopping/checkout.json" },
+        {
+          "type": "object",
+          "properties": {
+            "payment": {
+              "type": "object",
+              "properties": {
+                "instruments": {
+                  "type": "array",
+                  "items": {
+                    "if": {
+                      "properties": {
+                        "type": { "enum": ["algo", "asa"] }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "credential": { "$ref": "#/$defs/AlgorandCredential" }
+                      },
+                      "required": ["credential"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

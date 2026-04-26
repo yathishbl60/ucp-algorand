@@ -1,0 +1,131 @@
+{
+  "ucp": {
+    "version": "2026-04-08",
+    "services": {
+      "dev.ucp.shopping": [
+        {
+          "version": "2026-04-08",
+          "spec": "https://ucp.dev/2026-04-08/specification/overview",
+          "transport": "rest",
+          "endpoint": "https://shop.example.algorand/ucp/v1",
+          "schema": "https://ucp.dev/2026-04-08/services/shopping/rest.openapi.json"
+        },
+        {
+          "version": "2026-04-08",
+          "spec": "https://ucp.dev/2026-04-08/specification/overview",
+          "transport": "mcp",
+          "endpoint": "https://shop.example.algorand/ucp/mcp",
+          "schema": "https://ucp.dev/2026-04-08/services/shopping/mcp.openrpc.json"
+        }
+      ]
+    },
+    "capabilities": {
+      "dev.ucp.shopping.checkout": [
+        {
+          "version": "2026-04-08",
+          "spec": "https://ucp.dev/2026-04-08/specification/checkout",
+          "schema": "https://ucp.dev/2026-04-08/schemas/shopping/checkout.json"
+        }
+      ],
+      "dev.ucp.shopping.order": [
+        {
+          "version": "2026-04-08",
+          "spec": "https://ucp.dev/2026-04-08/specification/order",
+          "schema": "https://ucp.dev/2026-04-08/schemas/shopping/order.json",
+          "config": {
+            "webhook_url": "https://shop.example.algorand/ucp/webhooks/orders"
+          }
+        }
+      ],
+      "dev.ucp.shopping.fulfillment": [
+        {
+          "version": "2026-04-08",
+          "spec": "https://ucp.dev/2026-04-08/specification/fulfillment",
+          "schema": "https://ucp.dev/2026-04-08/schemas/shopping/fulfillment.json",
+          "extends": "dev.ucp.shopping.checkout"
+        }
+      ]
+    },
+    "payment_handlers": {
+      "org.algorand.shopping.payment_handler": [
+        {
+          "id": "algorand_mainnet_algo",
+          "version": "2026-04-26",
+          "spec": "https://raw.githubusercontent.com/algorand/ucp-algorand/main/schemas/algorand_payment_handler.json",
+          "schema": "https://raw.githubusercontent.com/algorand/ucp-algorand/main/schemas/algorand_payment_handler.json",
+          "available_instruments": [
+            {
+              "type": "algo"
+            },
+            {
+              "type": "asa",
+              "constraints": {
+                "asset_ids": [31566704, 312769]
+              }
+            }
+          ],
+          "config": {
+            "network": "mainnet",
+            "receiver_address": "ALGOMERCHANTADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "accepted_assets": [
+              {
+                "id": 0,
+                "symbol": "ALGO",
+                "decimals": 6,
+                "name": "Algorand"
+              },
+              {
+                "id": 31566704,
+                "symbol": "USDC",
+                "decimals": 6,
+                "name": "USD Coin"
+              },
+              {
+                "id": 312769,
+                "symbol": "USDT",
+                "decimals": 6,
+                "name": "Tether USD"
+              }
+            ],
+            "memo_field": "ucp_checkout_id",
+            "min_confirmations": 1,
+            "indexer_url": "https://mainnet-idx.algonode.cloud"
+          }
+        },
+        {
+          "id": "algorand_testnet",
+          "version": "2026-04-26",
+          "spec": "https://raw.githubusercontent.com/algorand/ucp-algorand/main/schemas/algorand_payment_handler.json",
+          "schema": "https://raw.githubusercontent.com/algorand/ucp-algorand/main/schemas/algorand_payment_handler.json",
+          "available_instruments": [{ "type": "algo" }],
+          "config": {
+            "network": "testnet",
+            "receiver_address": "ALGOMERCHANTADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "accepted_assets": [
+              {
+                "id": 0,
+                "symbol": "ALGO",
+                "decimals": 6,
+                "name": "Algorand"
+              }
+            ],
+            "memo_field": "ucp_checkout_id",
+            "min_confirmations": 1,
+            "indexer_url": "https://testnet-idx.algonode.cloud"
+          }
+        }
+      ]
+    }
+  },
+  "signing_keys": [
+    {
+      "kid": "algorand_merchant_2026",
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "REPLACE_WITH_REAL_X_COORDINATE",
+      "y": "REPLACE_WITH_REAL_Y_COORDINATE",
+      "use": "sig",
+      "alg": "ES256"
+    }
+  ]
+}
