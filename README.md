@@ -1,91 +1,117 @@
-# UCP Algorand Payment Handler
+# Pay with Algorand — in 4 seconds, for $0.001
 
-[![CI](https://img.shields.io/github/actions/workflow/status/YOUR_ORG/ucp-algorand/ci.yml?branch=main&label=CI)](https://github.com/YOUR_ORG/ucp-algorand/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/yathishbl60/ucp-algorand/ci.yml?branch=main&label=CI)](https://github.com/yathishbl60/ucp-algorand/actions/workflows/ci.yml)
 [![Node 22+](https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-Production-ready Algorand payment handler for the **Universal Commerce Protocol (UCP)**.
+**Accept ALGO and Algorand tokens in your store — no payment processor, no chargebacks, no KYC, no waiting days for settlement.**
 
-Buyer apps and AI agents discover your store, create a checkout session, pay on-chain
-with ALGO or any accepted ASA, and submit the txid for server-side verification — all
-over a standard REST API with no custom SDKs required on the buyer side.
+Built on the [Universal Commerce Protocol (UCP)](https://ucp.dev) — the open standard that lets AI agents, apps, and wallets pay any compatible merchant without custom integrations.
+
+---
+
+## Why this beats the alternatives
+
+| | **This project** | Coinbase Commerce | Stripe Crypto | PayPal Crypto |
+|---|---|---|---|---|
+| Settlement time | **~4 seconds** | Minutes–hours | Days | Days |
+| Transaction fee | **< $0.001** | 1% | 1.5% | 1.5–3.5% |
+| Chargebacks | **Impossible** | Possible | Possible | Possible |
+| KYC required | **No** | Yes | Yes | Yes |
+| AI agent native | **Yes** | No | No | No |
+| Self-hosted | **Yes** | No | No | No |
+| Open source | **Yes (Apache 2)** | No | No | No |
+
+---
+
+## The AI agent angle
+
+AI agents are buying things right now. GPT plugins, Claude tools, AutoGPT workflows — they all need a way to pay for goods and services autonomously.
+
+Traditional payment processors **don't work for agents**: they require user sessions, 2FA, card numbers, and human intervention at checkout.
+
+This project implements the [UCP payment handler spec](https://ucp.dev/specification/overview), which is purpose-built for machine-to-machine commerce. An agent can:
+
+1. Discover your store's payment capabilities with one HTTP request
+2. Create a checkout session
+3. Sign and submit an Algorand transaction from its wallet
+4. Complete the checkout — fully autonomously, no human in the loop
+
+See [`examples/ai_agent_checkout.ts`](examples/ai_agent_checkout.ts) for a working demo.
+
+---
+
+## 30-second quickstart
+
+```bash
+git clone https://github.com/yathishbl60/ucp-algorand.git
+cd ucp-algorand
+npm ci
+cp .env.example .env
+# Set ALGORAND_MERCHANT_ADDRESS in .env to your Algorand address
+npm run dev
+```
+
+Your store is now live at `http://localhost:8000`.
+
+Test it immediately:
+
+```bash
+curl http://localhost:8000/.well-known/ucp | jq
+```
+
+---
+
+## How a payment works
+
+```
+Agent / Buyer app             This server                   Algorand blockchain
+─────────────────             ───────────                   ──────────────────
+GET /.well-known/ucp ──►  Returns assets + merchant addr
+POST /checkout-sessions ──►  Creates session (pending)
+                              ◄── session ID returned
+[Sign + submit Algorand tx with session ID in note]  ──►  Confirmed in ~4s
+POST /checkout-sessions/{id}/complete ──►  Verifies tx on-chain
+                                           Amount ✓  Receiver ✓
+                                           Asset ✓   Note ✓
+                                           Session → complete ✓
+```
+
+---
+
+## What you get
+
+- **On-chain verification** — server checks receiver, amount, asset ID, and session ID in note. Fraudulent txids are rejected.
+- **Double-spend protection** — a txid can only complete one order, ever.
+- **4-second finality** — Algorand has immediate finality. No waiting for confirmations.
+- **Near-zero fees** — Algorand transactions cost ~0.001 ALGO (~$0.001).
+- **ALGO + stablecoins** — accepts native ALGO, USDC, USDt, and wrapped BTC/ETH.
+- **Idempotent API** — safe to retry any request with `X-Idempotency-Key`.
+- **Signed webhooks** — HMAC-SHA256 events to your order system on every state change.
+- **AI-agent ready** — discovery + checkout designed for autonomous machine clients.
 
 ---
 
 ## Table of Contents
 
-1. [Who this is for](#who-this-is-for)
-2. [How it works](#how-it-works)
-3. [Tech stack](#tech-stack)
-4. [Quick start (5 minutes)](#quick-start-5-minutes)
-5. [All environment variables](#all-environment-variables)
-6. [API reference](#api-reference)
-7. [Supported assets](#supported-assets)
-8. [Webhooks](#webhooks)
-9. [Security features](#security-features)
-10. [Development commands](#development-commands)
-11. [Architecture map](#architecture-map)
-12. [Local end-to-end demo (TestNet)](#local-end-to-end-demo-testnet)
-13. [Docker](#docker)
-14. [CI / CD](#ci--cd)
+1. [Quick start (5 minutes)](#quick-start-5-minutes)
+2. [All environment variables](#all-environment-variables)
+3. [API reference](#api-reference)
+4. [Supported assets](#supported-assets)
+5. [Webhooks](#webhooks)
+6. [Security features](#security-features)
+7. [AI agent integration](#ai-agent-integration)
+8. [Drop-in pay widget](#drop-in-pay-widget)
+9. [Development commands](#development-commands)
+10. [Architecture map](#architecture-map)
+11. [Local end-to-end demo (TestNet)](#local-end-to-end-demo-testnet)
+12. [Docker](#docker)
+13. [CI / CD](#ci--cd)
+14. [Roadmap](#roadmap)
 15. [Production checklist](#production-checklist)
 16. [Contributing](#contributing)
 17. [License](#license)
-
----
-
-## Who this is for
-
-| Audience | What you get |
-|---|---|
-| **Merchants** | Drop-in Algorand checkout backend — configure one `.env`, run one command |
-| **Platform / AI agent teams** | A spec-compliant UCP endpoint you can integrate against immediately |
-| **Algorand builders** | A clean extension point for new assets, escrow contracts, and settlement logic |
-
----
-
-## How it works
-
-```
-Buyer app                    This server                     Algorand TestNet / MainNet
-──────────                   ──────────                      ──────────────────────────
-GET /.well-known/ucp  ──►   Returns handler config,    ◄──  (merchant address live)
-                             accepted assets, merchant addr
-
-POST /ucp/v1/checkout-sessions  ──►  Creates session (pending)
-                                     Returns session ID + payment instructions
-
-[Buyer builds + signs tx off-chain, puts session ID in tx note]
-[Buyer submits tx directly to Algorand]
-
-POST /ucp/v1/checkout-sessions/{id}/complete  ──►  Server fetches tx from Indexer
-                                                     Verifies: receiver ✓ amount ✓
-                                                     asset ✓ note ✓ confirmations ✓
-                                                     Session → complete ✓
-                                                     Webhook dispatched ✓
-```
-
-Protocol identifiers:
-- **Handler namespace:** `org.algorand.shopping.payment_handler`
-- **UCP spec version:** `2026-04-08`
-- **Handler version:** `2026-04-26`
-
----
-
-## Tech stack
-
-| Layer | Choice | Why |
-|---|---|---|
-| Runtime | Node.js ≥ 22 | Native `fetch`, `crypto`, ESM support |
-| Language | TypeScript 5 (strict) | `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` |
-| Server | Fastify 5 | Schema-based serialization, pino logging, plugin system |
-| Validation | Zod 3 | Runtime schema validation + startup config guard |
-| Chain SDK | algosdk v3 | Official Algorand TypeScript SDK |
-| Quality | Biome 1.9 | Single tool for lint + format (replaces ESLint + Prettier) |
-| Testing | Jest + ts-jest | ESM-native integration tests |
-| CI | GitHub Actions | Typecheck → lint → test → build on every push |
-| Container | Docker (multi-stage) | `node:22-alpine`, non-root user, wget healthcheck |
 
 ---
 
@@ -94,12 +120,12 @@ Protocol identifiers:
 ### Prerequisites
 
 - Node.js ≥ 22 (`node --version`)
-- An Algorand address to receive payments
+- An Algorand address to receive payments ([create one free](https://wallet.myalgo.com))
 
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/YOUR_ORG/ucp-algorand.git
+git clone https://github.com/yathishbl60/ucp-algorand.git
 cd ucp-algorand
 npm ci
 ```
@@ -120,7 +146,7 @@ ALGORAND_MERCHANT_ADDRESS=YOUR_58_CHAR_ALGORAND_ADDRESS
 UCP_BASE_URL=http://localhost:8000
 ```
 
-> No Algonode API key is required for TestNet or MainNet — the public endpoints work out of the box.
+> No API key required — Algonode public endpoints work out of the box.
 
 ### 3. Start the server
 
@@ -128,19 +154,10 @@ UCP_BASE_URL=http://localhost:8000
 npm run dev
 ```
 
-You should see:
-
-```
-{"level":"info","msg":"Server listening at http://127.0.0.1:8000"}
-```
-
-### 4. Verify everything is running
+### 4. Verify
 
 ```bash
-# Health check
 curl http://localhost:8000/health
-
-# Inspect your UCP profile (shows accepted assets + merchant address)
 curl http://localhost:8000/.well-known/ucp | jq
 ```
 
@@ -153,43 +170,41 @@ curl http://localhost:8000/.well-known/ucp | jq
 | Variable | Description |
 |---|---|
 | `ALGORAND_NETWORK` | `testnet`, `mainnet`, or `betanet` |
-| `ALGORAND_ALGOD_URL` | Algod node base URL (no trailing slash) |
-| `ALGORAND_INDEXER_URL` | Indexer base URL (no trailing slash) |
-| `ALGORAND_MERCHANT_ADDRESS` | Your 58-char Algorand address that receives payments |
-| `UCP_BASE_URL` | Public base URL of this server (used in UCP profile links) |
+| `ALGORAND_ALGOD_URL` | Algod node base URL |
+| `ALGORAND_INDEXER_URL` | Indexer base URL |
+| `ALGORAND_MERCHANT_ADDRESS` | Your 58-char Algorand address |
+| `UCP_BASE_URL` | Public base URL of this server |
 
-### Optional — server behaviour
+### Optional — server
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `8000` | HTTP port to listen on |
+| `PORT` | `8000` | HTTP port |
 | `HOST` | `0.0.0.0` | Bind address |
-| `LOG_LEVEL` | `info` | Pino log level (`trace`, `debug`, `info`, `warn`, `error`) |
-| `NODE_ENV` | `development` | Set to `production` to enable production optimizations |
-| `ALGORAND_ALGOD_TOKEN` | _(empty)_ | API key for private Algod nodes |
-| `ALGORAND_INDEXER_TOKEN` | _(empty)_ | API key for private Indexer nodes |
-| `ALGORAND_MIN_CONFIRMATIONS` | `1` | Rounds before a payment is considered final (1 round ≈ 4 s) |
-| `RATE_LIMIT_MAX` | `100` | Max requests per window per IP |
-| `RATE_LIMIT_WINDOW_MS` | `60000` | Rate limit window in milliseconds |
-| `CORS_ORIGINS` | `*` | Comma-separated allowed origins (restrict in production) |
+| `LOG_LEVEL` | `info` | `trace` / `debug` / `info` / `warn` / `error` |
+| `NODE_ENV` | `development` | Set `production` for prod |
+| `ALGORAND_MIN_CONFIRMATIONS` | `1` | Rounds before payment is final (1 ≈ 4 s) |
+| `RATE_LIMIT_MAX` | `100` | Requests per window per IP |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | Window in ms |
+| `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
 
-### Optional — webhooks (both required together)
+### Optional — webhooks (set both or neither)
 
 | Variable | Description |
 |---|---|
-| `WEBHOOK_URL` | URL the server posts lifecycle events to |
-| `WEBHOOK_SECRET` | HMAC-SHA256 signing secret (min 16 chars). Must be set with `WEBHOOK_URL` |
+| `WEBHOOK_URL` | Your order system endpoint |
+| `WEBHOOK_SECRET` | HMAC signing secret (min 16 chars) |
 
 ### Optional — store branding
 
 | Variable | Description |
 |---|---|
-| `STORE_NAME` | Display name shown in the UCP profile |
-| `STORE_DESCRIPTION` | Short description of your store |
-| `STORE_SUPPORT_EMAIL` | Support contact shown to buyer platforms |
-| `STORE_LOGO_URL` | URL to your store logo |
+| `STORE_NAME` | Display name in UCP profile |
+| `STORE_DESCRIPTION` | Short store description |
+| `STORE_SUPPORT_EMAIL` | Support contact |
+| `STORE_LOGO_URL` | Logo URL |
 
-> The server validates all config at startup and exits immediately with a clear error message if anything is wrong.
+> Server validates all config at startup and exits with a clear message if anything is wrong.
 
 ---
 
@@ -199,12 +214,11 @@ curl http://localhost:8000/.well-known/ucp | jq
 
 #### `GET /`
 
-Returns service info and a list of available endpoints.
+Returns service info and endpoint list.
 
 #### `GET /.well-known/ucp`
 
-Returns the merchant's UCP profile: accepted payment handlers, asset list, merchant
-Algorand address, and optional branding metadata.
+Returns UCP profile: accepted assets, merchant address, optional branding.
 
 <details>
 <summary>Example response</summary>
@@ -233,102 +247,57 @@ Algorand address, and optional branding metadata.
 
 #### `GET /health`
 
-Liveness check. Returns `200 { status: "ok" }` when the server is up.
+Liveness. Returns `200` when server is up.
 
 #### `GET /ready`
 
-Readiness check. Verifies the Algorand node is reachable. Returns `200` when ready,
-`503` when the node is unavailable (use this for Kubernetes readiness probes).
+Readiness. Verifies Algorand node reachable. Returns `503` if not (use for k8s probes).
 
 ### Checkout sessions
 
-All checkout endpoints require the `UCP-Agent` header on mutating requests to identify the calling platform.
-
 #### `POST /ucp/v1/checkout-sessions`
-
-Create a new checkout session.
-
-**Headers:**
 
 ```
 UCP-Agent: profile="https://your-platform.example/ucp-profile"
-X-Idempotency-Key: <uuid>   (optional — ensures at-most-once creation)
+X-Idempotency-Key: <uuid>   (optional)
 ```
-
-**Request body:**
 
 ```json
 {
-  "line_items": [
-    {
-      "id": "item-1",
-      "description": "T-shirt (L)",
-      "quantity": 1,
-      "unit_price": 2000,
-      "currency": "USD"
-    }
-  ],
-  "totals": {
-    "subtotal": 2000,
-    "tax": 0,
-    "shipping": 0,
-    "total": 2000,
-    "currency": "USD"
-  }
+  "line_items": [{ "id": "item-1", "description": "T-shirt (L)", "quantity": 1, "unit_price": 2000, "currency": "USD" }],
+  "totals": { "subtotal": 2000, "tax": 0, "shipping": 0, "total": 2000, "currency": "USD" }
 }
 ```
 
-**Response:** `201` with session object including `id`, `status: "pending"`, and payment instructions.
+Returns `201` with session ID and payment instructions.
 
 #### `GET /ucp/v1/checkout-sessions/:id`
 
-Retrieve a checkout session by ID.
+Retrieve session.
 
 #### `PATCH /ucp/v1/checkout-sessions/:id`
 
-Update shipping address or buyer info on a `pending` session.
+Update shipping/buyer info on a `pending` session.
 
 #### `POST /ucp/v1/checkout-sessions/:id/complete`
 
-Submit the on-chain txid for verification and mark the session complete.
-
-**Request body:**
-
 ```json
-{
-  "payment_handler": "org.algorand.shopping.payment_handler",
-  "txid": "ALGORAND_TX_ID_HERE"
-}
+{ "payment_handler": "org.algorand.shopping.payment_handler", "txid": "ALGO_TX_ID" }
 ```
 
-The server:
-
-1. Fetches the transaction from the Algorand Indexer
-2. Verifies receiver address, amount, asset ID, and note contains the session ID
-3. Checks confirmation count ≥ `ALGORAND_MIN_CONFIRMATIONS`
-4. Guards against double-spend (same txid cannot complete two sessions)
-5. Moves session to `complete` and dispatches a `checkout.completed` webhook
+Server verifies on-chain, guards double-spend, marks complete, fires webhook.
 
 #### `DELETE /ucp/v1/checkout-sessions/:id`
 
-Cancel a `pending` session. Dispatches a `checkout.cancelled` webhook.
+Cancel session.
 
 ### Error format
-
-All errors follow the UCP error envelope:
 
 ```json
 {
   "ucp": {
     "status": "error",
-    "messages": [
-      {
-        "type": "error",
-        "code": "PAYMENT_VERIFICATION_FAILED",
-        "content": "Transaction receiver does not match merchant address",
-        "severity": "unrecoverable"
-      }
-    ]
+    "messages": [{ "type": "error", "code": "PAYMENT_VERIFICATION_FAILED", "content": "Receiver mismatch", "severity": "unrecoverable" }]
   }
 }
 ```
@@ -339,53 +308,38 @@ All errors follow the UCP error envelope:
 
 ### TestNet
 
-| Symbol | ASA ID | Decimals | Type |
-|---|---|---|---|
-| ALGO | 0 (native) | 6 | Native |
-| USDC | 10458941 | 6 | Stablecoin |
+| Symbol | ASA ID | Type |
+|---|---|---|
+| ALGO | 0 (native) | Native |
+| USDC | 10458941 | Stablecoin |
 
 ### MainNet
 
-| Symbol | ASA ID | Decimals | Type |
-|---|---|---|---|
-| ALGO | 0 (native) | 6 | Native |
-| USDC | 31566704 | 6 | Stablecoin |
-| USDt | 312769 | 6 | Stablecoin |
-| goBTC | 386192725 | 8 | Wrapped |
-| goETH | 386195940 | 8 | Wrapped |
+| Symbol | ASA ID | Type |
+|---|---|---|
+| ALGO | 0 (native) | Native |
+| USDC | 31566704 | Stablecoin |
+| USDt | 312769 | Stablecoin |
+| goBTC | 386192725 | Wrapped BTC |
+| goETH | 386195940 | Wrapped ETH |
 
-To add a new asset, edit `src/algorand/assets.ts`. No other changes are needed — the
-profile, verifier, and checkout routes pick it up automatically.
+To add an asset: edit `src/algorand/assets.ts`. Profile, verifier, and routes update automatically.
 
 ---
 
 ## Webhooks
 
-When `WEBHOOK_URL` and `WEBHOOK_SECRET` are both set, the server sends a signed HTTP
-POST to your endpoint on every checkout state change.
-
 ### Events
 
-| Event | Triggered when |
+| Event | When |
 |---|---|
-| `checkout.created` | New session is created |
-| `checkout.updated` | Session fields are patched |
-| `checkout.completed` | On-chain payment verified successfully |
-| `checkout.cancelled` | Session is cancelled |
-| `checkout.escalated` | Payment verification failed after all retries |
+| `checkout.created` | Session created |
+| `checkout.updated` | Session patched |
+| `checkout.completed` | Payment verified |
+| `checkout.cancelled` | Session cancelled |
+| `checkout.escalated` | Verification failed |
 
-### Request headers
-
-```
-X-UCP-Event: checkout.completed
-X-UCP-Delivery: <uuid>
-X-UCP-Signature: sha256=<hmac-sha256-hex>
-Content-Type: application/json
-```
-
-### Verifying the signature
-
-The signature is `HMAC-SHA256(raw_body, WEBHOOK_SECRET)` encoded as hex with a `sha256=` prefix.
+### Signature verification
 
 ```typescript
 import { createHmac } from "node:crypto";
@@ -396,7 +350,7 @@ function verifyWebhook(rawBody: string, secret: string, header: string): boolean
 }
 ```
 
-The server retries failed deliveries up to 3 times with exponential backoff.
+Retries up to 3× with exponential backoff.
 
 ---
 
@@ -404,35 +358,88 @@ The server retries failed deliveries up to 3 times with exponential backoff.
 
 | Feature | Detail |
 |---|---|
-| **On-chain verification** | Every txid verified against receiver address, amount, asset ID, and note field |
-| **Double-spend protection** | A txid can only complete one session — ever |
-| **Idempotency** | Checkout creation is idempotent via `X-Idempotency-Key` — safe to retry |
-| **Request IDs** | Every request gets a UUID for log tracing |
-| **Rate limiting** | Configurable per-IP limiting via `@fastify/rate-limit` |
-| **Secure headers** | `@fastify/helmet` sets HSTS, CSP, X-Frame-Options, and more |
-| **CORS** | Configurable allowed origins via `CORS_ORIGINS` |
-| **Config guard** | Server refuses to start if any required env var is missing or malformed |
-| **Signed webhooks** | HMAC-SHA256 on every outgoing event |
-| **Body size limit** | Requests capped at 1 MB |
+| On-chain verification | Receiver, amount, asset, note field all checked |
+| Double-spend protection | Txid can complete exactly one session |
+| Idempotency | `X-Idempotency-Key` — safe to retry |
+| Rate limiting | Per-IP via `@fastify/rate-limit` |
+| Secure headers | HSTS, CSP, X-Frame-Options via `@fastify/helmet` |
+| Signed webhooks | HMAC-SHA256 on every outgoing event |
+| Config guard | Server exits on bad config — no silent misconfigurations |
+| Body size limit | 1 MB cap |
+
+---
+
+## AI agent integration
+
+This server speaks the UCP protocol, which is designed for autonomous agents.
+
+See [`examples/ai_agent_checkout.ts`](examples/ai_agent_checkout.ts) for a full working example. The pattern is:
+
+```typescript
+// 1. Agent discovers what the merchant accepts
+const profile = await fetch("https://merchant.example.com/.well-known/ucp").then(r => r.json());
+
+// 2. Agent creates a checkout
+const session = await fetch("https://merchant.example.com/ucp/v1/checkout-sessions", {
+  method: "POST",
+  headers: { "UCP-Agent": 'profile="https://agent.example.com/profile"', "Content-Type": "application/json" },
+  body: JSON.stringify({ line_items: [...], totals: { ... } })
+}).then(r => r.json());
+
+// 3. Agent signs and submits Algorand tx with session ID in note
+// ... (algosdk)
+
+// 4. Agent completes checkout
+await fetch(`https://merchant.example.com/ucp/v1/checkout-sessions/${session.id}/complete`, {
+  method: "POST",
+  body: JSON.stringify({ payment_handler: "org.algorand.shopping.payment_handler", txid })
+});
+```
+
+No human interaction required at any step.
+
+---
+
+## Drop-in pay widget
+
+For browser-based storefronts, include the widget script in your checkout page:
+
+```html
+<script src="https://your-ucp-server.com/widget/pay.js"></script>
+
+<ucp-pay-button
+  server="https://your-ucp-server.com"
+  amount="19.99"
+  currency="USD"
+  item="Premium subscription"
+  on-complete="handlePaymentComplete">
+</ucp-pay-button>
+```
+
+The widget handles:
+- Showing accepted assets and QR code for mobile wallets
+- Polling for session completion
+- Triggering your callback when payment is confirmed
+
+See [`widget/`](widget/) for source and self-hosting instructions.
 
 ---
 
 ## Development commands
 
 ```bash
-npm run dev           # Start with tsx watch (auto-restarts on file changes)
+npm run dev           # tsx watch — auto-restarts on changes
 npm run build         # Compile TypeScript → dist/
-npm start             # Run compiled build (production mode)
+npm start             # Run compiled build
 
-npm run typecheck     # Strict TypeScript checks (no emit)
-npm run lint          # Biome lint check
-npm run lint:fix      # Biome autofix (safe fixes)
-npm run format        # Biome format (write)
-npm run quality       # typecheck + lint + tests (run before pushing)
+npm run typecheck     # Strict TS checks
+npm run lint          # Biome lint
+npm run lint:fix      # Biome autofix
+npm run quality       # typecheck + lint + tests
 
 npm test              # Run all tests
-npm run test:watch    # Tests in watch mode
-npm run test:coverage # Tests with coverage report
+npm run test:watch    # Watch mode
+npm run test:coverage # Coverage report
 ```
 
 ---
@@ -441,39 +448,33 @@ npm run test:coverage # Tests with coverage report
 
 ```
 src/
-├── config.ts                      Config loader — validates all env vars at startup
-├── types/
-│   └── ucp.ts                     UCP protocol types + constants
+├── config.ts                      Validates all env vars at startup
+├── types/ucp.ts                   UCP protocol types + constants
 ├── algorand/
-│   ├── assets.ts                  Accepted asset registry per network
-│   └── verifier.ts                On-chain tx verification (algod + indexer)
-├── store/
-│   └── checkout.ts                Checkout persistence + txid/idempotency registries
-├── utils/
-│   └── webhook.ts                 HMAC-signed webhook dispatcher + retry logic
+│   ├── assets.ts                  Asset registry per network — single source of truth
+│   └── verifier.ts                On-chain tx verification
+├── store/checkout.ts              Checkout persistence + double-spend / idempotency
+├── utils/webhook.ts               Signed webhook dispatcher + retry
 └── server/
-    ├── app.ts                     Fastify app factory (plugins, routes, config)
-    ├── profile.ts                 /.well-known/ucp profile builder
+    ├── app.ts                     Fastify factory
+    ├── profile.ts                 /.well-known/ucp builder
     └── routes/
         ├── health.ts              GET /, /health, /ready
-        └── checkout.ts            UCP checkout session lifecycle routes
+        └── checkout.ts            Checkout lifecycle
 
 examples/
-└── e2e_checkout.ts                Full end-to-end TestNet demo script
+├── e2e_checkout.ts                Full TestNet flow (buyer mnemonic required)
+└── ai_agent_checkout.ts           Autonomous agent payment demo
 
-schemas/
-└── algorand_payment_handler.json  JSON schema for the handler payload
+widget/
+└── pay.js                         Drop-in browser payment button
 ```
 
 ---
 
 ## Local end-to-end demo (TestNet)
 
-Run a complete checkout flow against your local server using a real Algorand TestNet transaction.
-
 ### Step 1 — Generate a buyer account
-
-Run this to create a fresh keypair:
 
 ```bash
 node --input-type=module << 'EOF'
@@ -484,97 +485,91 @@ console.log("Mnemonic:", algosdk.secretKeyToMnemonic(acct.sk));
 EOF
 ```
 
-> **Important:** Copy the address exactly from the terminal output. Do not retype it manually — Algorand addresses include a checksum and must be exactly 58 characters.
+> Copy the address exactly from the output — Algorand addresses include a checksum and must be 58 characters.
 
-### Step 2 — Fund the account
+### Step 2 — Fund it
 
-1. Open **https://bank.testnet.algorand.network/**
-2. Paste your address and click **Dispense** (you'll receive 10 test ALGO)
-3. Verify the balance at `https://testnet.algoexplorer.io/address/<your-address>`
+1. **https://bank.testnet.algorand.network/** → paste address → Dispense (10 test ALGO)
+2. Verify: `https://testnet.algoexplorer.io/address/<your-address>`
 
-### Step 3 — Set the merchant address in `.env`
-
-For a self-contained demo, use the same address for buyer and merchant (funds return to you):
+### Step 3 — Set `.env`
 
 ```env
-ALGORAND_MERCHANT_ADDRESS=<paste address from Step 1>
+ALGORAND_MERCHANT_ADDRESS=<address from Step 1>
 ```
 
-### Step 4 — Start the server
+### Step 4 — Run
 
 ```bash
 npm run dev
+# in another terminal:
+BUYER_MNEMONIC="word1 ... word25" npx tsx examples/e2e_checkout.ts
 ```
-
-### Step 5 — Run the demo
-
-```bash
-BUYER_MNEMONIC="word1 word2 ... word25" npx tsx examples/e2e_checkout.ts
-```
-
-The script will:
-
-1. `GET /.well-known/ucp` — discover handler config and merchant address
-2. `POST /ucp/v1/checkout-sessions` — create a checkout session
-3. Build, sign, and submit a `pay` transaction with the session ID in the `note` field
-4. Wait for on-chain confirmation (~4 s on TestNet)
-5. `POST /ucp/v1/checkout-sessions/{id}/complete` — submit txid for server-side verification
-6. Print the confirmed round and an AlgoExplorer link to the transaction
 
 ---
 
 ## Docker
 
-### Build
-
 ```bash
 docker build -t ucp-algorand .
-```
-
-### Run
-
-```bash
 docker run --env-file .env -p 8000:8000 ucp-algorand
 ```
 
-The image uses a multi-stage build (`node:22-alpine`) with a non-root `node` user and
-a `wget`-based healthcheck on `/health`.
+Multi-stage build, `node:22-alpine`, non-root `node` user, wget healthcheck on `/health`.
 
 ---
 
 ## CI / CD
 
-`.github/workflows/ci.yml` runs on every push and pull request to `main`:
+Every push/PR to `main`:
 
-1. `npm run typecheck` — strict TypeScript, no emit
-2. `npm run lint` — Biome rules
-3. `npm test -- --coverage` — integration tests with coverage
-4. `npm run build` — confirms the dist compiles cleanly
+1. `npm run typecheck`
+2. `npm run lint`
+3. `npm test -- --coverage`
+4. `npm run build`
+
+---
+
+## Roadmap
+
+See [`ROADMAP.md`](ROADMAP.md) for the full plan. Highlights:
+
+| Status | Item |
+|---|---|
+| ✅ Done | Core checkout API, on-chain verification, webhooks, double-spend protection |
+| ✅ Done | Biome quality gates, Jest tests, Docker, GitHub Actions CI |
+| 🔜 Next | Hosted TestNet sandbox (try without installing) |
+| 🔜 Next | Drop-in browser pay widget |
+| 🔜 Next | AI agent example (GPT tool / Claude MCP integration) |
+| 🔜 Next | Shopify app plugin |
+| 🔜 Next | Redis/Postgres persistence adapter |
+| 🔜 Next | Payment dashboard (incoming orders UI) |
+
+Good first issues are labeled [`good first issue`](https://github.com/yathishbl60/ucp-algorand/issues?q=label%3A%22good+first+issue%22) on GitHub.
 
 ---
 
 ## Production checklist
 
-Before going live on MainNet:
-
-- [ ] Replace Algonode public endpoints with a managed provider (e.g. NodelyTech, QuickNode) for uptime SLAs
-- [ ] Replace in-memory store with Redis or Postgres for multi-instance deployments
-- [ ] Set `WEBHOOK_URL` and a strong random `WEBHOOK_SECRET`
-- [ ] Restrict `CORS_ORIGINS` to your buyer platform domains
-- [ ] Set `NODE_ENV=production`
-- [ ] Run behind a TLS-terminating reverse proxy (nginx, Caddy, load balancer)
-- [ ] Set up alerting on `checkout.escalated` webhook events (payment failed to verify)
-- [ ] Monitor webhook retry queue for persistent delivery failures
+- [ ] Replace Algonode public endpoints with a managed provider (QuickNode, NodelyTech)
+- [ ] Replace in-memory store with Redis or Postgres
+- [ ] Set `WEBHOOK_URL` + strong `WEBHOOK_SECRET`
+- [ ] Restrict `CORS_ORIGINS` to your domains
+- [ ] `NODE_ENV=production`
+- [ ] TLS-terminating reverse proxy (nginx, Caddy)
+- [ ] Alert on `checkout.escalated` events
+- [ ] Monitor webhook retry failures
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, PR standards, how to add new
-ASAs, and how to deploy escrow contracts.
+See [CONTRIBUTING.md](CONTRIBUTING.md) — local setup, PR standards, how to add ASAs, how to deploy escrow contracts.
+
+Star the repo if this is useful. Open an issue if you're building something with it — I want to know.
 
 ---
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](LICENSE).

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UCP Pay Widget Demo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 480px;
+      margin: 80px auto;
+      padding: 0 24px;
+      color: #111;
+    }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    p { color: #666; font-size: 15px; margin-bottom: 32px; }
+    .product {
+      border: 1.5px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .product h2 { font-size: 16px; margin: 0 0 4px; }
+    .product p { margin: 0 0 16px; font-size: 14px; }
+    #result {
+      margin-top: 24px;
+      padding: 16px;
+      background: #f0fdf4;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #166534;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Demo Store</h1>
+  <p>Click a Pay button to open the Algorand payment widget.</p>
+
+  <div class="product">
+    <h2>Premium API Access — 1 month</h2>
+    <p>Unlimited API calls, priority support, advanced analytics.</p>
+    <ucp-pay-button
+      server="http://localhost:8000"
+      amount="5.00"
+      currency="USD"
+      item="Premium API Access — 1 month"
+      on-complete="handlePaymentComplete">
+    </ucp-pay-button>
+  </div>
+
+  <div class="product">
+    <h2>eBook: Building with Algorand</h2>
+    <p>200-page guide to smart contracts, ASAs, and DeFi on Algorand.</p>
+    <ucp-pay-button
+      server="http://localhost:8000"
+      amount="12.00"
+      currency="USD"
+      item="eBook: Building with Algorand"
+      on-complete="handlePaymentComplete">
+    </ucp-pay-button>
+  </div>
+
+  <div id="result"></div>
+
+  <!-- Load widget from your UCP server -->
+  <script src="pay.js"></script>
+  <script>
+    function handlePaymentComplete(txid, sessionId) {
+      const result = document.getElementById("result");
+      result.style.display = "block";
+      result.innerHTML = `
+        <strong>✓ Payment confirmed!</strong><br>
+        Session: <code>${sessionId}</code><br>
+        Transaction: <a href="https://testnet.algoexplorer.io/tx/${txid}" target="_blank">${txid}</a>
+      `;
+    }
+  </script>
+</body>
+</html>
