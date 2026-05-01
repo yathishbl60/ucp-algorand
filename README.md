@@ -1,4 +1,4 @@
-# Pay with Algorand — in 4 seconds, for $0.001
+# Pay with Algorand — in 2.82 s, for $0.001
 
 [![CI](https://img.shields.io/github/actions/workflow/status/yathishbl60/ucp-algorand/ci.yml?branch=main&label=CI)](https://github.com/yathishbl60/ucp-algorand/actions/workflows/ci.yml)
 [![Node 22+](https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -8,20 +8,6 @@
 **Accept ALGO and Algorand tokens in your store — no payment processor, no chargebacks, no KYC, no waiting days for settlement.**
 
 Built on the [Universal Commerce Protocol (UCP)](https://ucp.dev) — the open standard that lets AI agents, apps, and wallets pay any compatible merchant without custom integrations.
-
----
-
-## Why this beats the alternatives
-
-| | **This project** | Coinbase Commerce | Stripe Crypto | PayPal Crypto |
-|---|---|---|---|---|
-| Settlement time | **~4 seconds** | Minutes–hours | Days | Days |
-| Transaction fee | **< $0.001** | 1% | 1.5% | 1.5–3.5% |
-| Chargebacks | **Impossible** | Possible | Possible | Possible |
-| KYC required | **No** | Yes | Yes | Yes |
-| AI agent native | **Yes** | No | No | No |
-| Self-hosted | **Yes** | No | No | No |
-| Open source | **Yes (Apache 2)** | No | No | No |
 
 ---
 
@@ -71,7 +57,7 @@ Agent / Buyer app             This server                   Algorand blockchain
 GET /.well-known/ucp ──►  Returns assets + merchant addr
 POST /checkout-sessions ──►  Creates session (pending)
                               ◄── session ID returned
-[Sign + submit Algorand tx with session ID in note]  ──►  Confirmed in ~4s
+[Sign + submit Algorand tx with session ID in note]  ──►  Confirmed in ~2.82 s
 POST /checkout-sessions/{id}/complete ──►  Verifies tx on-chain
                                            Amount ✓  Receiver ✓
                                            Asset ✓   Note ✓
@@ -84,7 +70,7 @@ POST /checkout-sessions/{id}/complete ──►  Verifies tx on-chain
 
 - **On-chain verification** — server checks receiver, amount, asset ID, and session ID in note. Fraudulent txids are rejected.
 - **Double-spend protection** — a txid can only complete one order, ever.
-- **4-second finality** — Algorand has immediate finality. No waiting for confirmations.
+- **2.82 s finality** — Algorand has immediate finality. No waiting for confirmations.
 - **Near-zero fees** — Algorand transactions cost ~0.001 ALGO (~$0.001).
 - **ALGO + stablecoins** — accepts native ALGO, USDC, USDt, and wrapped BTC/ETH.
 - **Idempotent API** — safe to retry any request with `X-Idempotency-Key`.
@@ -183,7 +169,7 @@ curl http://localhost:8000/.well-known/ucp | jq
 | `HOST` | `0.0.0.0` | Bind address |
 | `LOG_LEVEL` | `info` | `trace` / `debug` / `info` / `warn` / `error` |
 | `NODE_ENV` | `development` | Set `production` for prod |
-| `ALGORAND_MIN_CONFIRMATIONS` | `1` | Rounds before payment is final (1 ≈ 4 s) |
+| `ALGORAND_MIN_CONFIRMATIONS` | `1` | Rounds before payment is final (1 ≈ 2.82 s) |
 | `RATE_LIMIT_MAX` | `100` | Requests per window per IP |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Window in ms |
 | `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
@@ -452,6 +438,7 @@ src/
 ├── types/ucp.ts                   UCP protocol types + constants
 ├── algorand/
 │   ├── assets.ts                  Asset registry per network — single source of truth
+│   ├── escrow.ts                  Escrow contract helpers
 │   └── verifier.ts                On-chain tx verification
 ├── store/checkout.ts              Checkout persistence + double-spend / idempotency
 ├── utils/webhook.ts               Signed webhook dispatcher + retry
@@ -467,7 +454,7 @@ examples/
 └── ai_agent_checkout.ts           Autonomous agent payment demo
 
 widget/
-└── pay.js                         Drop-in browser payment button
+└── pay.ts                         Drop-in browser payment button (source)
 ```
 
 ---
